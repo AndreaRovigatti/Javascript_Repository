@@ -1,0 +1,200 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <script src="https://unpkg.com/@reactivex/rxjs@5.0.0-beta.12/dist/global/Rx.js"></script>
+  <title>RxJS_Multicast_example_01</title>
+  <style>
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+
+    .switch input {
+      display: none;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      -webkit-transition: .4s;
+      transition: .4s;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      -webkit-transition: .4s;
+      transition: .4s;
+    }
+
+    input:checked+.slider {
+      background-color: #2196F3;
+    }
+
+    input:focus+.slider {
+      box-shadow: 0 0 1px #2196F3;
+    }
+
+    input:checked+.slider:before {
+      -webkit-transform: translateX(26px);
+      -ms-transform: translateX(26px);
+      transform: translateX(26px);
+    }
+
+    /* Rounded sliders */
+
+    .slider.round {
+      border-radius: 34px;
+    }
+
+    .slider.round:before {
+      border-radius: 50%;
+    }
+  </style>
+</head>
+
+<body>
+  <button id="idTasto01">Click1</button>
+  <button id="idTasto02">Click2</button>
+  <button id="idTasto03">Click3</button>
+  <button id="idTasto04">Click4</button>
+  <br/>
+  <br/>
+  <table>
+    <tr id="idR01">
+      <td id="idD01">
+        <textarea id="idText0101" rows="4" cols="15"></textarea>
+        <textarea id="idText0102" rows="4" cols="15"></textarea>
+        <textarea id="idText0103" rows="4" cols="15"></textarea>
+        <textarea id="idText0104" rows="4" cols="15"></textarea>
+      </td>
+    </tr>
+    <tr id="idR02">
+      <td id="idD02">
+        <textarea id="idText0201" rows="4" cols="15"></textarea>
+        <textarea id="idText0202" rows="4" cols="15"></textarea>
+        <textarea id="idText0203" rows="4" cols="15"></textarea>
+        <textarea id="idText0204" rows="4" cols="15"></textarea>
+      </td>
+    </tr>
+    <tr id="idR03">
+      <td id="idD03">
+        <textarea id="idText0301" rows="4" cols="15"></textarea>
+        <textarea id="idText0302" rows="4" cols="15"></textarea>
+        <textarea id="idText0303" rows="4" cols="15"></textarea>
+        <textarea id="idText0304" rows="4" cols="15"></textarea>
+      </td>
+    </tr>
+    <tr id="idR04">
+      <td id="idD04">
+        <textarea id="idText0401" rows="4" cols="15"></textarea>
+        <textarea id="idText0402" rows="4" cols="15"></textarea>
+        <textarea id="idText0403" rows="4" cols="15"></textarea>
+        <textarea id="idText0404" rows="4" cols="15"></textarea>
+      </td>
+    </tr>
+  </table>
+  <label class="switch">
+    <input id="idCheck" type="checkbox">
+    <span class="slider round"></span>
+  </label>
+
+  <script>
+
+    function createObjectFromEvent(event) {
+      return { "id": event.target.id, "text": event.target.innerText }
+    }
+
+    function insertText(ogg, idNodo, ms) {
+      setTimeout(function () {
+        document.getElementById(idNodo).innerText = ogg.id + " " + ogg.text + " " + Date.now();
+      }, ms);
+    }
+
+    function cleanTextArea() {
+      document.querySelectorAll("textarea").forEach((item, index) => {
+        item.innerText = '';
+      });
+    }
+
+    function createObserver(idNodoObserver) {
+      let obs =
+        Rx.Observable.fromEvent(document.querySelectorAll('#' + idNodoObserver), 'click')
+          .map(event => createObjectFromEvent(event))
+          .scan((risultato, oggetto) => risultato = oggetto, {});
+      return obs;
+    }
+
+    class Recipients {
+      constructor(multicasted, recipientList) {
+        this.recipientList = [];
+        this.establishMulticast(multicasted, recipientList);
+      }
+
+      establishMulticast(multicasted, recipientList) {
+        this.recipientList = [];
+
+        for (let recipientIstance of recipientList) {
+          this.recipientList.push(multicasted.subscribe({
+            next: recipientIstance.functionNext
+          }));
+        }
+
+        multicasted.connect();
+      }
+
+      disableMulticast() {
+        for (let recipientIstance of this.recipientList) {
+          recipientIstance.unsubscribe();
+        }
+      }
+    }
+
+    document.onreadystatechange = function () {
+      if (document.readyState === "complete") {
+        const functionList = [
+          { functionNext: () => cleanTextArea() },
+          { functionNext: (ogg) => insertText(ogg, 'idText0203', 800) },
+          { functionNext: (ogg) => insertText(ogg, 'idText0104', 987) },
+          { functionNext: (ogg) => insertText(ogg, 'idText0303', 1000) },
+          { functionNext: (ogg) => insertText(ogg, 'idText0401', 1700) },
+        ];
+        //observable creation and multicast recipients subjects
+        let recipient = new Recipients(createObserver("idTasto03").multicast(new Rx.Subject()), functionList);
+        //multicast if checkbox toggle checked
+        document.getElementById("idCheck").addEventListener("change",
+          (event) => {
+            cleanTextArea();
+            if (document.getElementById("idCheck").checked) {
+              recipient.establishMulticast(createObserver("idTasto03").multicast(new Rx.Subject()), functionList);
+            } else {
+              recipient.disableMulticast();
+            }
+          }
+        );
+
+        //active toggle on bootstrap
+        document.getElementById("idCheck").checked = true;
+      }
+    }
+
+  </script>
+</body>
+
+</html>
